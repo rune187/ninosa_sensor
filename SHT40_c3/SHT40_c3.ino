@@ -1,10 +1,10 @@
-/*************************************************** 
+/***************************************************
   This is an example for the SHT4x Humidity & Temp Sensor
 
   Designed specifically to work with the SHT4x sensor from Adafruit
   ----> https://www.adafruit.com/products/4885
 
-  These sensors use I2C to communicate, 2 pins are required to  
+  These sensors use I2C to communicate, 2 pins are required to
   interface
  ****************************************************/
 
@@ -38,13 +38,13 @@ void setup() {
   // You can have 3 different precisions, higher precision takes longer
   sht4.setPrecision(SHT4X_HIGH_PRECISION);
   switch (sht4.getPrecision()) {
-     case SHT4X_HIGH_PRECISION: 
+     case SHT4X_HIGH_PRECISION:
        Serial.println("High precision");
        break;
-     case SHT4X_MED_PRECISION: 
+     case SHT4X_MED_PRECISION:
        Serial.println("Med precision");
        break;
-     case SHT4X_LOW_PRECISION: 
+     case SHT4X_LOW_PRECISION:
        Serial.println("Low precision");
        break;
   }
@@ -54,35 +54,34 @@ void setup() {
   // and reads will take longer too!
   sht4.setHeater(SHT4X_NO_HEATER);
   switch (sht4.getHeater()) {
-     case SHT4X_NO_HEATER: 
+     case SHT4X_NO_HEATER:
        Serial.println("No heater");
        break;
-     case SHT4X_HIGH_HEATER_1S: 
+     case SHT4X_HIGH_HEATER_1S:
        Serial.println("High heat for 1 second");
        break;
-     case SHT4X_HIGH_HEATER_100MS: 
+     case SHT4X_HIGH_HEATER_100MS:
        Serial.println("High heat for 0.1 second");
        break;
-     case SHT4X_MED_HEATER_1S: 
+     case SHT4X_MED_HEATER_1S:
        Serial.println("Medium heat for 1 second");
        break;
-     case SHT4X_MED_HEATER_100MS: 
+     case SHT4X_MED_HEATER_100MS:
        Serial.println("Medium heat for 0.1 second");
        break;
-     case SHT4X_LOW_HEATER_1S: 
+     case SHT4X_LOW_HEATER_1S:
        Serial.println("Low heat for 1 second");
        break;
-     case SHT4X_LOW_HEATER_100MS: 
+     case SHT4X_LOW_HEATER_100MS:
        Serial.println("Low heat for 0.1 second");
        break;
   }
-  
 }
 
 
 void loop() {
   sensors_event_t humidity, temp;
-  
+
   uint32_t timestamp = millis();
   sht4.getEvent(&humidity, &temp);// populate temp and humidity objects with fresh data
   timestamp = millis() - timestamp;
