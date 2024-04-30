@@ -84,12 +84,6 @@ void setup() {
 
   // init Serial
   Serial.begin(115200);
-  while (!Serial) {
-    delay(10);
-    digitalWrite(LED, HIGH);
-    delay(10);
-    digitalWrite(LED, LOW);
-  }
   Serial.println("Serial begin");
   pinMode(LED, OUTPUT);
 
