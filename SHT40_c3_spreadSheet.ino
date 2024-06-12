@@ -1,3 +1,7 @@
+// スプレッドシートに送信処理が一定時間経過すると失敗することがあったので1分でリセット
+// 温度の計測は5秒に1回行っている。もっと短いスパンにしてもいいかも
+// 絶対湿度をセンサから取得した相対湿度、温度をもとに計算して表示&スプレッドシートへ送信
+
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <NTPClient.h>
@@ -7,20 +11,28 @@
 #include "Adafruit_SHT4x.h"
 
 #define LED 10
-// cicac
-// #define WIFI_SSID "Arai Fruits IoT 2.4G"
-// #define WIFI_PASS "00000022"
+
 // ninosa
-#define WIFI_SSID "HR02a-8ACA77"
-#define WIFI_PASS "wzM0xFEesa"
+// #define WIFI_SSID "HR02a-8ACA77"
+// #define WIFI_PASS "wzM0xFEesa"
+
+// cicac
+#define WIFI_SSID "Arai Fruits IoT 2.4G"
+#define WIFI_PASS "00000022"
+
 #define UTC_OFFSET_IN_SECONDS 32400  // 日本の場合は32400（9時間）
-#define GOOGLE_SCRIPT_KEY "AKfycbyPCiH3E8JmOUo_0VLBXm2VbzRV9LwmO3zD7GXbTPLR0cbV986TMOKjRG9QCb04EuoZ"
+
+// #define GOOGLE_SCRIPT_KEY "AKfycbyPCiH3E8JmOUo_0VLBXm2VbzRV9LwmO3zD7GXbTPLR0cbV986TMOKjRG9QCb04EuoZ" // ninosa本番
+#define GOOGLE_SCRIPT_KEY "AKfycbzffbaAZ5kpdKfZzn3SiCL0-3xcp3fhk8iuh6IoyQHpJVQZSue243hC91rYMpRy8gzq" // home_TH_graph
 
 Adafruit_SHT4x sht4 = Adafruit_SHT4x();
+
 WiFiClientSecure secureClient;
 WiFiClient client;
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", UTC_OFFSET_IN_SECONDS);
+
+NTPClient timeClient(ntpUDP, "ntp.nict.jp", UTC_OFFSET_IN_SECONDS);
+unsigned long lastExecutionTime = 0;
 
 void setup() {
   // https setup
@@ -104,7 +116,7 @@ void setup() {
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) { // WiFi接続が切れていたら再接続
+  if (WiFi.status() != WL_CONNECTED) {  // WiFi接続が切れていたら再接続
     Serial.println("Wifi connection is broken, so reconnect");
     WiFi.reconnect();
     while (WiFi.status() != WL_CONNECTED) {
@@ -120,18 +132,36 @@ void loop() {
   sensors_event_t humidity, temp;
   sht4.getEvent(&humidity, &temp);
 
+  float absoluteHumidity = calculateAbsoluteHumidity(temp.temperature, humidity.relative_humidity);
+
+  // 比較用の現在時刻を取得
+  unsigned long curretnTime = timeClient.getEpochTime();
+  // 初回は送信
+  if (lastExecutionTime == 0) {
+    accessToGoogleSheets(timeClient.getFormattedTime(), temp.temperature, absoluteHumidity);
+    delay(50);
+    lastExecutionTime = curretnTime;
+  }
+
+  // 1分経過でリセット
+  if (curretnTime - lastExecutionTime >= 60) {
+    lastExecutionTime = curretnTime;
+    delay(50);
+    reset();
+  }
+
   Serial.print("Time: ");
   Serial.println(timeClient.getFormattedTime());
   Serial.print("Temperature: ");
   Serial.print(temp.temperature);
   Serial.println("℃");
   Serial.print("Humidity: ");
-  Serial.print(humidity.relative_humidity);
+  Serial.print(absoluteHumidity);
   Serial.println("%");
   Serial.println("");
 
   float sendData1 = temp.temperature;
-  float sendData2 = humidity.relative_humidity;
+  float sendData2 = absoluteHumidity;
 
   // I2Cでデータをボードへ送信
   delay(100);
@@ -140,9 +170,6 @@ void loop() {
   Wire.write((byte*)&sendData2, sizeof(sendData2));
   Wire.endTransmission();  // 送信終了
 
-  delay(100);
-
-  // accessToGoogleSheets(timeClient.getFormattedTime(), temp.temperature, humidity.relative_humidity);
 
   for (int i = 0; i < 2; i++) {
     digitalWrite(LED, HIGH);
@@ -151,9 +178,17 @@ void loop() {
     delay(100);
   }
   // delay(60000); // スプレッドシートへ送信する際はこちらのdelayを使用
-  delay(5000);
+  delay(4700);
 }
 
+// 絶対湿度を計算
+float calculateAbsoluteHumidity(float temp, float relativeHumi) {
+  float e = 6.1078 * pow(10, (7.5 * temp / (temp + 237.3)));
+  float absoluteHumi = 217 * e / (temp + 273.15) * relativeHumi / 100;
+  return absoluteHumi;
+}
+
+// google spreadSheetへデータ送信
 void accessToGoogleSheets(String time, float temperature, float humidity) {
   HTTPClient http;
   String URL = "https://script.google.com/macros/s/" + String(GOOGLE_SCRIPT_KEY) + "/exec?";
@@ -173,4 +208,10 @@ void accessToGoogleSheets(String time, float temperature, float humidity) {
   }
 
   http.end();  // HTTPClientの解放
+}
+
+// 定期リセット用
+void reset() {
+  Serial.println("esp reset");
+  ESP.restart();
 }
